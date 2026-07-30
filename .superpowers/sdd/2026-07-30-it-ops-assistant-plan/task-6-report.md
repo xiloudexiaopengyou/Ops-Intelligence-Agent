@@ -38,3 +38,48 @@ Brief 中未提供 evaluate_model.py 的完整代码（仅有 Gradio app.py 代�
 git add src/evaluate_model.py tests/test_evaluate.py
 git commit -m "feat: add model evaluator with ROUGE-L/Token-F1 metrics and comparison plots"
 ```
+
+---
+
+## FIX ROUND 1: 按 spec 重写 evaluate_model.py
+
+**日期**: 2026-07-30
+
+### 变更内容
+
+**`src/evaluate_model.py`** — 完全替换，严格按照 plan 中 Task 3.2 的规格实现：
+
+1. `ModelEvaluator.__init__(self, test_data_path: str)` — 单参数，轻量级，加载 JSONL 测试数据。rouge_score/bert_score 采用延迟加载，避免库未安装时导致初始化失败。
+2. `evaluate(self, model, tokenizer, model_name, max_samples=50) -> dict[str, float]` — 接受 model+tokenizer+model_name，返回 `{"rouge1": float, "rouge2": float, "rougeL": float, "bert_score": float}` 简单字典。
+3. 实现了 4 项指标：`rouge1`、`rouge2`、`rougeL`（使用 `rouge_score` 库）、`bert_score`（使用 `bert_score` 库，`bert-base-chinese`）。
+4. `_hf_generate()` — HuggingFace 本地推理辅助方法。
+5. `_vllm_generate()` — vLLM API 推理辅助方法。
+6. `plot_comparison(baseline_scores, lora_scores, save_path)` — 简单双柱柱状图（单图，4 个指标分组对比），非 2x2 网格。
+
+**已移除**（旧版本中的非规格内容）：
+- 双后端架构（HF / vLLM 选择逻辑分散在类初始化中）
+- `_setup_chinese_font()` 中文字体配置
+- 详细的 CLI 参数（保留简单的 `--test_path` / `--output`）
+- `_print_summary()` 方法
+- `token_f1`、`exact_match`、`avg_time` 指标
+- 自定义的 `_compute_rouge_l`、`_compute_token_f1`、`_compute_exact_match` 函数
+
+**计划偏离**（仅一处最小必要）：将 `rouge_score` 和 `bert_score` 的顶层导入改为 `_init_scorers()` 延迟加载，避免库未安装时 `__init__` 失败 — `__init__` 仅负责加载测试数据，应在无 ML 依赖时仍可工作。
+
+**`tests/test_evaluate.py`** — 简化为 2 个测试类 2 个测试方法：
+
+1. `TestModelEvaluatorInit::test_loads_test_data` — 验证初始化正确加载 JSONL 测试数据
+2. `TestPlotComparison::test_generates_image` — 验证 `plot_comparison` 生成有效图片文件（>1KB）
+
+### 测试结果
+
+```
+2 passed in 1.53s
+```
+
+### Commit
+
+```
+git add src/evaluate_model.py tests/test_evaluate.py
+git commit -m "fix: rewrite evaluate_model.py to match spec — ROUGE/BERTScore, simple bar chart"
+```
