@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  vllm:
+    image: it-ops-assistant
+    command: >
+      python -m vllm.entrypoints.openai.api_server
+      --model unsloth/Qwen2.5-7B-Instruct
+      --enable-lora
+      --lora-modules itops=./outputs/lora_final/final_lora
+      --max-lora-rank 16
+      --gpu-memory-utilization 0.85
+      --max-model-len 2048
+      --port 8000
+    ports: ["8000:8000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  app:
+    image: it-ops-assistant
+    command: python src/app.py
+    ports: ["7860:7860"]
+    depends_on: [vllm]
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000/v1
