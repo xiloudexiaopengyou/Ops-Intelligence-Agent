@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能IT运维助手 — UI 设计预览</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-primary:   #0f1119;
+    --surface-secondary: #1a1d2a;
+    --surface-tertiary:  #242838;
+    --border-subtle:     #2d3245;
+    --text-primary:      #e4e6ed;
+    --text-secondary:    #8b909f;
+    --accent-primary:    #4da6ff;
+    --accent-success:    #34d399;
+    --accent-warning:    #f59e0b;
+    --accent-danger:     #f87171;
+    --accent-purple:     #a78bfa;
+    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: var(--surface-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── 顶部状态栏 ── */
+  .status-bar {
+    display: flex; align-items: center; gap: 24px;
+    padding: 10px 20px;
+    background: var(--surface-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+  .status-bar .dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .status-bar .dot.ok    { background: var(--accent-success); box-shadow: 0 0 6px var(--accent-success); }
+  .status-bar .dot.warn  { background: var(--accent-warning); box-shadow: 0 0 6px var(--accent-warning); }
+  .status-bar .dot.danger{ background: var(--accent-danger);  box-shadow: 0 0 6px var(--accent-danger); }
+  .status-bar .divider   { width:1px; height:16px; background:var(--border-subtle); }
+  .status-bar .value     { color: var(--text-primary); font-weight: 500; }
+
+  /* ── Header ── */
+  .header {
+    padding: 28px 24px 0;
+    flex-shrink: 0;
+  }
+  .header h1 { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .header .subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* ── Tab bar ── */
+  .tab-bar {
+    display: flex; gap: 0;
+    margin: 20px 24px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 10px 20px;
+    font-size: 13px; color: var(--text-secondary);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.15s; font-weight: 500;
+    position: relative; top: 1px;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
+  .tab .accent-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; vertical-align:middle; position:relative; top:-1px; }
+
+  /* ── 主内容区 ── */
+  .main-content {
+    display: flex; gap: 20px;
+    padding: 20px 24px;
+    flex: 1; min-height: 0;
+  }
+  .chat-area {
+    flex: 6; display: flex; flex-direction: column;
+    background: var(--surface-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+  }
+  .chat-messages {
+    flex: 1; padding: 20px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .chat-input-row {
+    display: flex; gap: 10px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-tertiary);
+  }
+  .chat-input-row input {
+    flex:1; background: var(--surface-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 14px; color: var(--text-primary);
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 13px;
+    outline: none;
+  }
+  .chat-input-row input:focus { border-color: var(--accent-primary); }
+  .chat-input-row button {
+    background: var(--accent-primary); color: #fff;
+    border: none; border-radius: var(--radius-md);
+    padding: 10px 20px; cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .chat-input-row button:hover { opacity: 0.85; }
+
+  /* ── 消息气泡 ── */
+  .msg { max-width: 85%; line-height: 1.6; font-size: 13px; }
+  .msg.user { align-self: flex-end; }
+  .msg.user .bubble {
+    background: var(--accent-primary); color: #fff;
+    padding: 10px 16px; border-radius: var(--radius-md);
+  }
+  .msg.assistant .bubble {
+    background: var(--surface-tertiary); color: var(--text-primary);
+    padding: 12px 16px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+  }
+  .msg .source-card {
+    margin-top: 10px;
+    border-left: 3px solid var(--accent-purple);
+    padding: 8px 12px;
+    background: rgba(167,139,250,0.06);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .msg .source-card .file-icon { color: var(--accent-purple); margin-right: 4px; }
+
+  /* ── 右侧面板 ── */
+  .side-panel {
+    flex: 3; display: flex; flex-direction: column; gap: 12px;
+    min-width: 220px;
+  }
+  .quick-card {
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    cursor: pointer; font-size: 13px;
+    transition: border-color 0.15s;
+    color: var(--text-secondary);
+  }
+  .quick-card:hover { border-color: var(--accent-primary); color: var(--text-primary); }
+  .quick-card .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--accent-primary);
+    margin-right: 8px;
+  }
+
+  /* ── Agent 步骤面板 ── */
+  .agent-step {
+    border-left: 2px solid var(--border-subtle);
+    padding: 4px 0 4px 16px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .agent-step .label { color: var(--accent-purple); font-weight: 600; font-family: 'JetBrains Mono',monospace; }
+  .agent-step .detail { color: var(--text-secondary); margin-top: 2px; }
+
+  /* ── 对比面板 ── */
+  .comparison {
+    display: flex; gap: 16px; flex: 1;
+  }
+  .comparison .col {
+    flex:1; background: var(--surface-tertiary);
+    border-radius: var(--radius-md); padding: 16px;
+    border: 1px solid var(--border-subtle);
+    font-size: 13px; line-height: 1.6;
+  }
+  .comparison .col .label {
+    font-family: 'JetBrains Mono',monospace; font-size:11px;
+    font-weight: 600; margin-bottom: 8px;
+  }
+  .comparison .col.base .label { color: var(--accent-danger); }
+  .comparison .col.lora .label { color: var(--accent-success); }
+
+  /* ── 评估面板 ── */
+  .metric-grid {
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 12px;
+  }
+  .metric-card {
+    background: var(--surface-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 16px; text-align: center;
+  }
+  .metric-card .value {
+    font-family: 'JetBrains Mono',monospace;
+    font-size: 28px; font-weight: 700;
+  }
+  .metric-card .label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+  .metric-card .delta { font-size: 12px; margin-top: 2px; }
+  .metric-card .delta.up { color: var(--accent-success); }
+  .bar-chart {
+    display: flex; align-items: flex-end; gap: 24px;
+    height: 120px; padding: 20px 0;
+  }
+  .bar-group { display: flex; gap:4px; align-items: flex-end; }
+  .bar {
+    width: 32px; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: height 0.5s;
+  }
+  .bar.base { background: var(--accent-danger); opacity: 0.8; }
+  .bar.lora { background: var(--accent-success); opacity: 0.8; margin-left: -20px; }
+
+  /* ── 响应式 ── */
+  @media (max-width: 768px) {
+    .main-content { flex-direction: column; }
+    .side-panel { flex-direction: row; flex-wrap: wrap; min-width:0; }
+    .quick-card { flex: 1; min-width: 130px; }
+    .status-bar { font-size: 10px; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ 顶部状态栏 ═══ -->
+<div class="status-bar">
+  <span><span class="dot ok"></span>GPU Normal</span>
+  <span>VRAM <span class="value">6.1</span>/<span class="value">8.0</span> GB</span>
+  <span class="divider"></span>
+  <span>模型 <span class="value">Qwen2.5-7B-LoRA</span></span>
+  <span class="divider"></span>
+  <span>运行 <span class="value">02:34:17</span></span>
+  <span style="margin-left:auto">vLLM :8000</span>
+  <span class="divider" style="margin-left:0"></span>
+  <span>ChromaDB 12,842 块</span>
+</div>
+
+<!-- ═══ Header ═══ -->
+<div class="header">
+  <h1>🚀 智能IT运维助手</h1>
+  <div class="subtitle">Qwen2.5-7B · QLoRA · RAG · LangGraph Agent · RTX 4060</div>
+</div>
+
+<!-- ═══ Tab 栏 ═══ -->
+<div class="tab-bar">
+  <div class="tab active"><span class="accent-dot" style="background:var(--accent-success)"></span>📚 RAG 知识问答</div>
+  <div class="tab"><span class="accent-dot" style="background:var(--accent-primary)"></span>🧠 LoRA 微调问答</div>
+  <div class="tab"><span class="accent-dot" style="background:var(--accent-warning)"></span>📊 模型对比</div>
+  <div class="tab"><span class="accent-dot" style="background:var(--accent-primary)"></span>🤖 Agent 推理</div>
+  <div class="tab">📈 评估报告</div>
+</div>
+
+<!-- ═══ 主内容区（展示当前激活的 RAG Tab） ═══ -->
+<div class="main-content">
+  <!-- 聊天区 -->
+  <div class="chat-area">
+    <div class="chat-messages">
+      <div class="msg user"><div class="bubble">公司VPN怎么配置？</div></div>
+      <div class="msg assistant">
+        <div class="bubble">
+          根据<b>员工手册第 1.1 节</b>，VPN 配置步骤如下：<br><br>
+          1️⃣ 访问 <code style="font-family:'JetBrains Mono',monospace;background:rgba(77,166,255,0.1);color:var(--accent-primary);padding:1px 6px;border-radius:3px">vpn.chengguo.com</code><br>
+          2️⃣ 使用企业微信扫码登录<br>
+          3️⃣ 下载对应平台客户端（Windows / macOS / 手机）<br>
+          4️⃣ 首次登录需输入 MFA 动态验证码<br><br>
+          ⚠️ 注意：VPN 密码与 OA 系统同步，每 90 天需更换一次。
+        </div>
+        <div class="source-card">
+          <span class="file-icon">📄</span> 来源：员工手册 §1.1 · 关联度 91% · 第 3 页
+        </div>
+      </div>
+
+      <div class="msg user"><div class="bubble">入职3年，年假有几天？</div></div>
+      <div class="msg assistant">
+        <div class="bubble">
+          根据<b>员工手册第 4.1 节「年假计算规则」</b>：<br><br>
+          • 入职 <b>1 年以内</b>：5 天带薪年假<br>
+          • 入职 <b>1-3 年</b>：10 天带薪年假<br>
+          • 入职 <b>3-5 年</b>：<span style="color:var(--accent-success);font-weight:600">15 天带薪年假</span><br>
+          • 入职 <b>5 年以上</b>：每增加 1 年，增加 1 天（上限 20 天）<br><br>
+          ✅ 您入职 3 年，可享受 <b>15 天</b>带薪年假。
+        </div>
+        <div class="source-card">
+          <span class="file-icon">📄</span> 来源：员工手册 §4.1 · 关联度 96% · 第 8 页
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" placeholder="输入问题，例如：CPU 使用率过高怎么排查？" value="">
+      <button>发送 ↵</button>
+    </div>
+  </div>
+
+  <!-- 快捷问题面板 -->
+  <div class="side-panel" style="flex:2.5">
+    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">快捷问题</div>
+    <div class="quick-card"><span class="num">01</span>公司VPN怎么配置？</div>
+    <div class="quick-card"><span class="num">02</span>入职3年，年假有几天？</div>
+    <div class="quick-card"><span class="num">03</span>服务器CPU超过90%怎么办？</div>
+    <div class="quick-card"><span class="num">04</span>如何申请IT设备采购？</div>
+    <div class="quick-card"><span class="num">05</span>收到可疑邮件怎么处理？</div>
+
+    <!-- 对比区当前不展示，只在对比 Tab 时才出现 -->
+    <div style="margin-top:auto;font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">系统指标</div>
+    <div class="metric-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="metric-card">
+        <div class="value" style="font-size:18px;color:var(--accent-success)">91%</div>
+        <div class="label">检索召回率</div>
+      </div>
+      <div class="metric-card">
+        <div class="value" style="font-size:18px;color:var(--accent-primary)">198ms</div>
+        <div class="label">平均检索延迟</div>
+      </div>
+      <div class="metric-card">
+        <div class="value" style="font-size:18px;color:var(--accent-purple)">12,842</div>
+        <div class="label">已索引文档块</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Tab 2: LoRA 微调问答 ═══ -->
+<div class="main-content" style="display:none">
+  <div class="chat-area">
+    <div class="chat-messages">
+      <div class="msg user"><div class="bubble">服务器CPU超过90%怎么办？</div></div>
+      <div class="msg assistant">
+        <div class="bubble">
+          按照公司 SOP 标准操作流程：<br><br>
+          1️⃣ 登录 CMDB 查看服务器归属（<code style="font-family:'JetBrains Mono',monospace;background:rgba(77,166,255,0.1);color:var(--accent-primary);padding:1px 6px;border-radius:3px">cmdb.chengguo.com</code>）<br>
+          2️⃣ SSH 登录后执行 <code style="font-family:'JetBrains Mono',monospace;background:rgba(77,166,255,0.1);color:var(--accent-primary);padding:1px 6px;border-radius:3px">top -c -o %CPU</code> 查看异常进程<br>
+          3️⃣ 如果是业务服务 → 联系 DevOps 二线值班<br>
+          4️⃣ 如果是系统进程 → 提 IT 运维工单，升级 P1 优先级<br>
+          5️⃣ 确认无业务影响后可执行 <code style="font-family:'JetBrains Mono',monospace;background:rgba(77,166,255,0.1);color:var(--accent-primary);padding:1px 6px;border-radius:3px">kill -9 [PID]</code> 终止异常进程<br><br>
+          ⚠️ <b>关键决策点</b>：如果服务器在 DMZ 区域，需先申请堡垒机临时授权。
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" placeholder="输入IT运维问题..." value="">
+      <button>发送 ↵</button>
+    </div>
+  </div>
+  <div class="side-panel" style="flex:2.5">
+    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">当前模型</div>
+    <div class="quick-card" style="cursor:default;border-color:var(--accent-primary)">
+      <span style="color:var(--accent-primary);font-weight:600">Qwen2.5-7B + LoRA</span><br>
+      <span style="font-size:11px;color:var(--text-secondary)">rank=16 · IT运维领域微调 · 2,559条训练</span>
+    </div>
+    <div class="metric-grid" style="grid-template-columns:repeat(2,1fr);margin-top:12px">
+      <div class="metric-card">
+        <div class="value" style="font-size:18px;color:var(--accent-success)">0.67</div>
+        <div class="label">ROUGE-L</div>
+        <div class="delta up">+0.15 vs 基座</div>
+      </div>
+      <div class="metric-card">
+        <div class="value" style="font-size:18px;color:var(--accent-success)">0.89</div>
+        <div class="label">BERTScore</div>
+        <div class="delta up">+0.08 vs 基座</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Tab 3: 模型对比 ═══ -->
+<div class="main-content" style="display:none">
+  <div style="flex:1;display:flex;flex-direction:column;gap:16px">
+    <div style="font-size:13px;color:var(--text-secondary)">输入同一个问题，对比基座模型和微调模型的效果差异</div>
+    <div class="chat-input-row" style="border-radius:var(--radius-md)">
+      <input type="text" placeholder="输入对比问题..." value="Oracle 数据库连接池耗尽怎么排查？">
+      <button>对比 ⚡</button>
+    </div>
+    <div class="comparison">
+      <div class="col base">
+        <div class="label">🔴 基座模型 Qwen2.5-7B</div>
+        数据库连接池耗尽通常是由于连接未及时释放导致。建议检查应用代码中连接是否正确关闭，可以适当增大连接池大小，或者设置连接超时时间。如果问题持续，重启数据库服务通常可以临时解决。
+      </div>
+      <div class="col lora">
+        <div class="label">🟢 微调模型 Qwen2.5-7B-LoRA</div>
+        Oracle 连接池耗尽排查 SOP：<br><br>
+        1. 登录数据库执行 <code style="font-family:'JetBrains Mono',monospace;background:rgba(52,211,153,0.1);color:var(--accent-success);padding:1px 6px;border-radius:3px">SELECT * FROM v$session WHERE status='ACTIVE'</code><br>
+        2. 检查 <code style="font-family:'JetBrains Mono',monospace;background:rgba(52,211,153,0.1);color:var(--accent-success);padding:1px 6px;border-radius:3px">v$resource_limit</code> 确认是否达到 processes 上限<br>
+        3. 如果是连接泄漏 → 查应用日志，定位未关闭连接的方法<br>
+        4. 如果是正常业务增长 → 提变更工单调大 processes 参数<br>
+        5. 紧急情况可执行 <code style="font-family:'JetBrains Mono',monospace;background:rgba(52,211,153,0.1);color:var(--accent-success);padding:1px 6px;border-radius:3px">ALTER SYSTEM KILL SESSION</code> 释放僵死连接
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Tab 4: Agent 推理 ═══ -->
+<div class="main-content" style="display:none">
+  <div class="chat-area">
+    <div class="chat-messages">
+      <div class="msg user"><div class="bubble">检查所有服务器CPU，超过80%的发告警邮件，然后告诉我结果</div></div>
+      <div class="msg assistant">
+        <div class="bubble" style="background:transparent;border:none;padding:0">
+          <div class="agent-step">
+            <div class="label">🤔 思考</div>
+            <div class="detail">用户需要查 CPU 监控 → 发告警 → 汇报结果。先调 query_cpu_monitor。</div>
+          </div>
+          <div class="agent-step">
+            <div class="label">🔧 行动</div>
+            <div class="detail" style="font-family:'JetBrains Mono',monospace;font-size:11px">query_cpu_monitor(threshold=80)</div>
+          </div>
+          <div class="agent-step">
+            <div class="label">👁️ 观察</div>
+            <div class="detail">
+              <span style="color:var(--accent-danger)">web-01: 92%</span> ·
+              <span style="color:var(--accent-danger)">web-03: 85%</span> ·
+              <span style="color:var(--accent-danger)">db-01: 88%</span> ·
+              <span style="color:var(--text-secondary)">其余 9 台正常</span>
+            </div>
+          </div>
+          <div class="agent-step">
+            <div class="label">🤔 思考</div>
+            <div class="detail">3 台超标，需要发告警邮件。</div>
+          </div>
+          <div class="agent-step">
+            <div class="label">🔧 行动</div>
+            <div class="detail" style="font-family:'JetBrains Mono',monospace;font-size:11px">send_alert_email(servers=["web-01","web-03","db-01"])</div>
+          </div>
+          <div class="agent-step" style="border-left-color:var(--accent-success)">
+            <div class="label" style="color:var(--accent-success)">👁️ 观察</div>
+            <div class="detail" style="color:var(--accent-success)">邮件已发送至 it-team@chengguo.com<br>消息ID：msg_20260730_1523</div>
+          </div>
+          <div style="margin-top:12px;padding:12px;background:var(--surface-tertiary);border-radius:var(--radius-md);border:1px solid var(--border-subtle);font-size:13px">
+            ✅ <b>最终回答</b><br>
+            已检查全部 <b>12</b> 台服务器：<br>
+            • 🟢 正常：9 台<br>
+            • 🔴 超标：web-01 (92%)、web-03 (85%)、db-01 (88%)<br>
+            📧 告警邮件已发送至 <b>it-team@chengguo.com</b>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" placeholder="描述自动化任务，例：重启 web-03 的 nginx 服务" value="">
+      <button>执行 ▶</button>
+    </div>
+  </div>
+  <div class="side-panel" style="flex:2.5">
+    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">可用工具</div>
+    <div class="quick-card" style="cursor:default">🔍 query_cpu_monitor(threshold)</div>
+    <div class="quick-card" style="cursor:default">📧 send_alert_email(servers, recipient)</div>
+    <div class="quick-card" style="cursor:default">📋 query_cmdb(server_name)</div>
+    <div class="quick-card" style="cursor:default">🎫 create_ticket(title, description, priority)</div>
+    <div class="quick-card" style="cursor:default">🔄 restart_service(server, service_name)</div>
+  </div>
+</div>
+
+<!-- ═══ Tab 5: 评估报告 ═══ -->
+<div class="main-content" style="display:none">
+  <div style="flex:1;display:flex;flex-direction:column;gap:20px">
+    <div style="font-size:13px;color:var(--text-secondary)">基座模型 vs 微调后模型 · 多维评估对比</div>
+
+    <!-- 指标卡片 -->
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="value" style="color:var(--accent-primary)">+0.15</div>
+        <div class="label">ROUGE-L 提升</div>
+        <div class="delta up">0.52 → 0.67</div>
+      </div>
+      <div class="metric-card">
+        <div class="value" style="color:var(--accent-success)">+0.08</div>
+        <div class="label">BERTScore 提升</div>
+        <div class="delta up">0.81 → 0.89</div>
+      </div>
+      <div class="metric-card">
+        <div class="value" style="color:var(--accent-warning)">+22%</div>
+        <div class="label">OpsEval 准确率提升</div>
+        <div class="delta up">50% → 72%</div>
+      </div>
+    </div>
+
+    <!-- 柱状图 -->
+    <div style="background:var(--surface-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:20px">
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">ROUGE-L / BERTScore 对比</div>
+      <div class="bar-chart" style="justify-content:space-around">
+        <div style="text-align:center">
+          <div class="bar-group">
+            <div class="bar base" style="height:52px"></div>
+            <div class="bar lora" style="height:67px"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:8px">ROUGE-L</div>
+          <div style="font-size:10px;color:var(--text-secondary)">基座 0.52 → 微调 0.67</div>
+        </div>
+        <div style="text-align:center">
+          <div class="bar-group">
+            <div class="bar base" style="height:81px"></div>
+            <div class="bar lora" style="height:89px"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:8px">BERTScore</div>
+          <div style="font-size:10px;color:var(--text-secondary)">基座 0.81 → 微调 0.89</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
