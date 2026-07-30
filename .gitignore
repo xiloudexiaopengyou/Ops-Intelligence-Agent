@@ -10,6 +10,7 @@ venv/
 # 模型与数据
 outputs/
 chroma_db/
+charts/
 *.safetensors
 *.bin
 *.pt

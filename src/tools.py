@@ -7,6 +7,8 @@ get_all_tools() 返回已注册工具列表，供 Agent 使用。
 
 import time
 import uuid
+import os
+from pathlib import Path
 from abc import ABC, abstractmethod
 
 
@@ -256,6 +258,283 @@ class QueryLogs(BaseTool):
         return {"server": server, "keyword": keyword, "time_range": time_range, "count": len(matched), "logs": matched}
 
 
+class GenerateChart(BaseTool):
+    name = "generate_chart"
+    description = (
+        "根据数据生成图表并保存为 PNG 文件。"
+        "支持柱状图(bar)、横向柱状图(hbar)、饼图(pie)、折线图(line)、多系列分组柱状图(grouped_bar)。"
+        "data 中 labels 为标签列表，values 为数值列表（饼图/单系列），"
+        "或多系列时使用 series 字典: {\"系列1\": [值列表], \"系列2\": [值列表]}。"
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "chart_type": {
+                "type": "string",
+                "enum": ["bar", "hbar", "pie", "line", "grouped_bar"],
+                "description": "图表类型: bar=柱状图, hbar=横向柱状图, pie=饼图, line=折线图, grouped_bar=多系列分组柱状图",
+            },
+            "title": {"type": "string", "description": "图表标题"},
+            "data": {
+                "type": "object",
+                "description": (
+                    "图表数据。单系列: {\"labels\": [...], \"values\": [...]}。"
+                    "多系列(grouped_bar): {\"labels\": [...], \"series\": {\"系列1\": [...], \"系列2\": [...]}}。"
+                    "饼图会在每个扇区标注百分比。"
+                ),
+            },
+            "xlabel": {"type": "string", "description": "X 轴标签（饼图忽略）", "default": ""},
+            "ylabel": {"type": "string", "description": "Y 轴标签（饼图忽略）", "default": ""},
+            "color_theme": {
+                "type": "string",
+                "enum": ["blue", "green", "red", "orange", "purple", "mixed"],
+                "description": "配色主题，默认 blue",
+                "default": "blue",
+            },
+        },
+        "required": ["chart_type", "title", "data"],
+    }
+
+    # 配色方案
+    COLOR_MAP = {
+        "blue":   ["#4DA6FF", "#1A6DD4", "#0D47A1", "#82C4FF", "#B3DCFF"],
+        "green":  ["#34D399", "#1B8A5A", "#065F3E", "#6EE7B7", "#A7F3D0"],
+        "red":    ["#F87171", "#D32F2F", "#B71C1C", "#FCA5A5", "#FECACA"],
+        "orange": ["#F59E0B", "#E65100", "#BF360C", "#FBBF24", "#FDE68A"],
+        "purple": ["#A78BFA", "#6D28D9", "#4C1D95", "#C4B5FD", "#DDD6FE"],
+        "mixed":  ["#4DA6FF", "#34D399", "#F59E0B", "#F87171", "#A78BFA", "#82C4FF"],
+    }
+
+    def execute(self, chart_type: str, title: str, data: dict,
+                xlabel: str = "", ylabel: str = "",
+                color_theme: str = "blue", **kwargs) -> dict:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.font_manager as fm
+        import numpy as np
+
+        # ── 中文字体设置 ──
+        self._setup_chinese_font(fm, matplotlib)
+
+        # ── 创建输出目录 ──
+        charts_dir = Path("charts")
+        charts_dir.mkdir(exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"{chart_type}_{ts}_{uuid.uuid4().hex[:6]}.png"
+        save_path = str(charts_dir / filename)
+
+        # ── 选择配色 ──
+        colors = self.COLOR_MAP.get(color_theme, self.COLOR_MAP["blue"])
+
+        # ── 按类型生成 ──
+        if chart_type == "pie":
+            self._draw_pie(title, data, colors, save_path)
+        elif chart_type == "bar":
+            self._draw_bar(title, data, xlabel, ylabel, colors, save_path)
+        elif chart_type == "hbar":
+            self._draw_hbar(title, data, xlabel, ylabel, colors, save_path)
+        elif chart_type == "line":
+            self._draw_line(title, data, xlabel, ylabel, colors, save_path)
+        elif chart_type == "grouped_bar":
+            self._draw_grouped_bar(title, data, xlabel, ylabel, colors, save_path)
+        else:
+            return {"success": False, "error": f"不支持的图表类型: {chart_type}"}
+
+        return {
+            "success": True,
+            "chart_type": chart_type,
+            "title": title,
+            "path": save_path,
+            "filename": filename,
+        }
+
+    # ── 各图表绘制方法 ──
+
+    def _setup_chinese_font(self, fm, matplotlib):
+        """尝试配置中文字体"""
+        try:
+            # Windows 常用中文字体
+            for font_name in ["Microsoft YaHei", "SimHei", "PingFang SC", "Noto Sans CJK SC", "WenQuanYi Micro Hei"]:
+                found = [f for f in fm.findSystemFonts() if font_name.lower().replace(" ", "") in f.lower().replace(" ", "")]
+                if found:
+                    matplotlib.rcParams["font.family"] = font_name
+                    return
+            # 回退: 扫描系统所有字体找一个 CJK 字体
+            for f in fm.findSystemFonts():
+                if any(kw in f.lower() for kw in ["yahei", "simhei", "simsun", "cjk", "chinese", "noto"]):
+                    prop = fm.FontProperties(fname=f)
+                    matplotlib.rcParams["font.family"] = prop.get_name()
+                    return
+        except Exception:
+            pass
+        # 最终回退：sans-serif
+        matplotlib.rcParams["font.family"] = "sans-serif"
+
+    def _draw_bar(self, title, data, xlabel, ylabel, colors, save_path):
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        labels = data.get("labels", [])
+        values = data.get("values", [])
+        if not labels or not values:
+            raise ValueError("bar 图表需要 labels 和 values")
+
+        fig, ax = plt.subplots(figsize=(max(8, len(labels) * 0.6), 5.5))
+        bar_colors = [colors[i % len(colors)] for i in range(len(labels))]
+        bars = ax.bar(labels, values, color=bar_colors, edgecolor="#1A1D2A", linewidth=0.5)
+
+        # 柱顶标注
+        for bar_obj, val in zip(bars, values):
+            ax.text(bar_obj.get_x() + bar_obj.get_width() / 2, bar_obj.get_height() + max(values) * 0.01,
+                    str(val), ha="center", va="bottom", fontsize=9, fontweight="bold")
+
+        ax.set_title(title, fontsize=14, fontweight="bold", pad=15)
+        if xlabel:
+            ax.set_xlabel(xlabel, fontsize=11)
+        if ylabel:
+            ax.set_ylabel(ylabel, fontsize=11)
+        ax.grid(True, axis="y", alpha=0.25)
+        ax.set_axisbelow(True)
+        plt.xticks(rotation=30, ha="right", fontsize=9)
+        plt.tight_layout()
+        fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+
+    def _draw_hbar(self, title, data, xlabel, ylabel, colors, save_path):
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        labels = data.get("labels", [])
+        values = data.get("values", [])
+        if not labels or not values:
+            raise ValueError("hbar 图表需要 labels 和 values")
+
+        fig, ax = plt.subplots(figsize=(7, max(4, len(labels) * 0.45)))
+        bar_colors = [colors[i % len(colors)] for i in range(len(labels))]
+        bars = ax.barh(labels, values, color=bar_colors, edgecolor="#1A1D2A", linewidth=0.5)
+
+        for bar_obj, val in zip(bars, values):
+            ax.text(bar_obj.get_width() + max(values) * 0.01, bar_obj.get_y() + bar_obj.get_height() / 2,
+                    str(val), va="center", fontsize=9, fontweight="bold")
+
+        ax.set_title(title, fontsize=14, fontweight="bold", pad=15)
+        if xlabel:
+            ax.set_xlabel(xlabel, fontsize=11)
+        if ylabel:
+            ax.set_ylabel(ylabel, fontsize=11)
+        ax.grid(True, axis="x", alpha=0.25)
+        ax.set_axisbelow(True)
+        ax.invert_yaxis()
+        plt.tight_layout()
+        fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+
+    def _draw_pie(self, title, data, colors, save_path):
+        import matplotlib.pyplot as plt
+
+        labels = data.get("labels", [])
+        values = data.get("values", [])
+        if not labels or not values:
+            raise ValueError("pie 图表需要 labels 和 values")
+
+        fig, ax = plt.subplots(figsize=(7, 7))
+        explode = [0.03] * len(labels)
+
+        wedges, texts, autotexts = ax.pie(
+            values, labels=None, autopct="%1.1f%%", startangle=140,
+            colors=colors[:len(labels)], explode=explode,
+            pctdistance=0.6, wedgeprops={"edgecolor": "white", "linewidth": 1.5},
+        )
+        for t in autotexts:
+            t.set_fontsize(10)
+            t.set_fontweight("bold")
+
+        # 图例放在右侧
+        ax.legend(wedges, [f"{l} ({v})" for l, v in zip(labels, values)],
+                  title="图例", loc="center left", bbox_to_anchor=(1, 0.5), fontsize=9)
+
+        ax.set_title(title, fontsize=14, fontweight="bold", pad=15)
+        plt.tight_layout()
+        fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+
+    def _draw_line(self, title, data, xlabel, ylabel, colors, save_path):
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        labels = data.get("labels", [])
+        values = data.get("values", [])
+        if not labels or not values:
+            raise ValueError("line 图表需要 labels 和 values")
+
+        fig, ax = plt.subplots(figsize=(max(8, len(labels) * 0.5), 5.5))
+        ax.plot(labels, values, color=colors[0], marker="o", linewidth=2,
+                markersize=6, markerfacecolor="white", markeredgewidth=2, markeredgecolor=colors[0])
+
+        # 数据点标注
+        for i, (x, y) in enumerate(zip(labels, values)):
+            ax.annotate(str(y), (x, y), textcoords="offset points", xytext=(0, 10),
+                        ha="center", fontsize=8, fontweight="bold", color=colors[0])
+
+        ax.fill_between(range(len(labels)), values, alpha=0.08, color=colors[0])
+        ax.set_title(title, fontsize=14, fontweight="bold", pad=15)
+        if xlabel:
+            ax.set_xlabel(xlabel, fontsize=11)
+        if ylabel:
+            ax.set_ylabel(ylabel, fontsize=11)
+        ax.grid(True, alpha=0.25)
+        ax.set_axisbelow(True)
+        plt.xticks(rotation=30, ha="right", fontsize=9)
+        plt.tight_layout()
+        fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+
+    def _draw_grouped_bar(self, title, data, xlabel, ylabel, colors, save_path):
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        labels = data.get("labels", [])
+        series = data.get("series", {})
+        if not labels or not series:
+            raise ValueError("grouped_bar 图表需要 labels 和 series")
+
+        series_names = list(series.keys())
+        n_groups = len(labels)
+        n_series = len(series_names)
+        x = np.arange(n_groups)
+        width = 0.8 / n_series
+
+        fig, ax = plt.subplots(figsize=(max(10, n_groups * 1.0), 6))
+
+        for i, sname in enumerate(series_names):
+            vals = series[sname]
+            offset = (i - (n_series - 1) / 2) * width
+            bar_color = colors[i % len(colors)]
+            bars = ax.bar(x + offset, vals, width, label=sname, color=bar_color,
+                          edgecolor="#1A1D2A", linewidth=0.3)
+            # 柱顶标注（仅在系列数 ≤3 时标注，避免拥挤）
+            if n_series <= 3:
+                for bar_obj, val in zip(bars, vals):
+                    ax.text(bar_obj.get_x() + bar_obj.get_width() / 2,
+                            bar_obj.get_height() + max(max(v) for v in series.values()) * 0.01,
+                            str(val), ha="center", va="bottom", fontsize=7, fontweight="bold")
+
+        ax.set_title(title, fontsize=14, fontweight="bold", pad=15)
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=9)
+        if xlabel:
+            ax.set_xlabel(xlabel, fontsize=11)
+        if ylabel:
+            ax.set_ylabel(ylabel, fontsize=11)
+        ax.legend(fontsize=10, loc="upper right")
+        ax.grid(True, axis="y", alpha=0.25)
+        ax.set_axisbelow(True)
+        plt.tight_layout()
+        fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+
+
 # ============================================================
 # 注册表
 # ============================================================
@@ -272,6 +551,7 @@ def _register():
         CreateTicket(),
         RestartService(),
         QueryLogs(),
+        GenerateChart(),
     ]
 
 _register()
