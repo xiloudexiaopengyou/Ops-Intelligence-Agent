@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# 模型与数据
+outputs/
+chroma_db/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# 环境
+.env
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 备份
+*_backup.*
