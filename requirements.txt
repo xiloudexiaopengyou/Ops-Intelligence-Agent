@@ -1,0 +1,41 @@
+# 深度学习
+torch>=2.3.0
+transformers>=4.44.0
+accelerate>=0.30.0
+bitsandbytes>=0.43.0
+
+# 微调
+unsloth>=2024.7
+peft>=0.11.0
+trl>=0.9.0
+datasets>=2.19.0
+
+# RAG
+llama-index>=0.10.0
+llama-index-vector-stores-chroma>=0.1.0
+chromadb>=0.5.0
+sentence-transformers>=2.7.0
+
+# Agent
+langgraph>=0.1.0
+langchain>=0.2.0
+
+# 评估
+rouge-score>=0.1.2
+bert-score>=0.3.13
+matplotlib>=3.8.0
+
+# 界面
+gradio>=4.20.0
+
+# 部署
+vllm>=0.5.0
+openai>=1.30.0
+
+# GPU 监控
+pynvml>=11.5.0
+
+# 工具
+requests>=2.31.0
+tqdm>=4.66.0
+numpy>=1.26.0
