@@ -18,6 +18,13 @@
 | 🤖 **Agent 推理** | ReAct 模式多步推理引擎，支持 8 种运维工具调用（监控查询、告警、工单、CMDB 等） |
 | 📈 **自动化评估** | ROUGE-L 自动评估基座 vs 微调模型，生成对比柱状图 |
 
+<img width="2550" height="1237" alt="屏幕截图 2026-08-03 211121" src="https://github.com/user-attachments/assets/e2a33173-77f0-40d4-af9e-0da823d2259d" />
+<img width="2539" height="1234" alt="屏幕截图 2026-08-03 211130" src="https://github.com/user-attachments/assets/08794100-1a92-473c-9447-c2c1e148506c" />
+<img width="2516" height="1235" alt="屏幕截图 2026-08-03 211137" src="https://github.com/user-attachments/assets/8cbc092e-2b65-45ac-be3b-9e4ab45439ef" />
+<img width="2541" height="1234" alt="屏幕截图 2026-08-03 211147" src="https://github.com/user-attachments/assets/b5407181-c4df-4cbb-ad27-a85418c61d53" />
+<img width="2519" height="1237" alt="屏幕截图 2026-08-03 211155" src="https://github.com/user-attachments/assets/b4a6d219-fde9-4ccd-a094-f280fd6061ff" />
+
+
 ## 🏗️ 系统架构
 
 ```
