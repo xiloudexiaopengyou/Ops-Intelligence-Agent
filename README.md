@@ -23,6 +23,7 @@
 <img width="2516" height="1235" alt="屏幕截图 2026-08-03 211137" src="https://github.com/user-attachments/assets/8cbc092e-2b65-45ac-be3b-9e4ab45439ef" />
 <img width="2541" height="1234" alt="屏幕截图 2026-08-03 211147" src="https://github.com/user-attachments/assets/b5407181-c4df-4cbb-ad27-a85418c61d53" />
 <img width="2519" height="1237" alt="屏幕截图 2026-08-03 211155" src="https://github.com/user-attachments/assets/b4a6d219-fde9-4ccd-a094-f280fd6061ff" />
+<img width="1482" height="884" alt="evaluation" src="https://github.com/user-attachments/assets/ed55038d-cc4f-48d3-b596-aa2087f52231" />
 
 
 ## 🏗️ 系统架构
