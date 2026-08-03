@@ -1,5 +1,5 @@
 """
-RAG 检索增强系统 — ChromaDB + 自研语义分块器 + LlamaIndex 编排
+RAG 检索增强系统 — TF-IDF 向量检索（零网络依赖，无需下载模型）
 
 用法:
     from src.rag_system import RAGSystem
@@ -8,138 +8,151 @@ RAG 检索增强系统 — ChromaDB + 自研语义分块器 + LlamaIndex 编排
     print(result["answer"], result["sources"])
 """
 
+import re
 from pathlib import Path
-
-import chromadb
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
-from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
-from src.chunker import SemanticChunker
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 
 class RAGSystem:
     def __init__(
         self,
         doc_dir: str = "./docs",
-        persist_dir: str = "./chroma_db",
-        collection_name: str = "docs",
-        embedding_model: str = "BAAI/bge-small-en-v1.5",
-        similarity_threshold: float = 0.7,
         max_chunk_size: int = 512,
         top_k: int = 3,
     ):
         self.doc_dir = Path(doc_dir)
-        self.persist_dir = Path(persist_dir)
-        self.collection_name = collection_name
         self.top_k = top_k
+        self.max_chunk_size = max_chunk_size
 
-        # Embedding 模型 — 强制 CPU
-        self.embed_model = HuggingFaceEmbedding(
-            model_name=embedding_model,
-            device="cpu",
-        )
-        Settings.embed_model = self.embed_model
+        # 读取文档 → 分块 → 构建 TF-IDF 索引
+        self.chunks = []          # list of {"text": str, "source": str}
+        self.vectorizer = None
+        self.chunk_vectors = None
+        self._build_index()
 
-        # 自研分块器
-        self.chunker = SemanticChunker(
-            embedding_model=embedding_model,
-            similarity_threshold=similarity_threshold,
-            max_chunk_size=max_chunk_size,
-            device="cpu",
-        )
+    def _read_files(self):
+        """递归读取 docs/ 下所有 .md/.txt 文件"""
+        texts = []
+        for fpath in self.doc_dir.rglob("*"):
+            if fpath.is_file() and fpath.suffix.lower() in (".md", ".txt"):
+                try:
+                    content = fpath.read_text(encoding="utf-8", errors="ignore")
+                    if content.strip():
+                        texts.append({
+                            "text": content,
+                            "source": str(fpath.relative_to(self.doc_dir)),
+                        })
+                except Exception:
+                    pass
+        return texts
 
-        # 向量库
-        self.persist_dir.mkdir(parents=True, exist_ok=True)
-        self.chroma_client = chromadb.PersistentClient(path=str(self.persist_dir))
+    def _split_text(self, text: str) -> list[str]:
+        """简单分块：按段落 + 长度限制"""
+        paragraphs = re.split(r'\n\s*\n', text)
+        chunks = []
+        current = ""
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            if len(current) + len(para) < self.max_chunk_size:
+                current += para + "\n"
+            else:
+                if current.strip():
+                    chunks.append(current.strip())
+                current = para + "\n"
+        if current.strip():
+            chunks.append(current.strip())
+        return chunks or [text[:self.max_chunk_size]]
 
-        # 加载或构建索引
-        self.index = self._load_or_build()
+    def _build_index(self):
+        """构建 TF-IDF 向量索引"""
+        print(f"📚 构建 TF-IDF 索引: {self.doc_dir}")
 
-    def _load_or_build(self):
-        """加载已有索引，不存在则构建"""
-        try:
-            collection = self.chroma_client.get_collection(self.collection_name)
-            if collection.count() > 0:
-                print(f"📚 加载已有索引: {collection.count()} 个块")
-                vector_store = ChromaVectorStore(chroma_collection=collection)
-                return VectorStoreIndex.from_vector_store(
-                    vector_store, embed_model=self.embed_model
-                )
-        except Exception:
-            pass
+        # 读取
+        docs = self._read_files()
+        print(f"  读取 {len(docs)} 个文件")
 
-        return self.build_index(str(self.doc_dir))
-
-    def build_index(self, doc_dir: str) -> int:
-        """构建/重建索引，返回 chunk 数量"""
-        doc_dir = Path(doc_dir)
-        print(f"📚 构建索引: {doc_dir}")
-
-        # 读取文档
-        documents = SimpleDirectoryReader(str(doc_dir)).load_data()
-        print(f"  读取 {len(documents)} 个文档")
-
-        # 语义分块
-        docs_for_chunker = [
-            {"text": doc.text, "metadata": doc.metadata} for doc in documents
-        ]
-        chunks = self.chunker.chunk_documents(docs_for_chunker)
-        print(f"  分块: {len(chunks)} 个语义块")
-
-        # 写入 ChromaDB
-        try:
-            self.chroma_client.delete_collection(self.collection_name)
-        except Exception:
-            pass
-        collection = self.chroma_client.create_collection(self.collection_name)
-
-        for i, chunk in enumerate(chunks):
-            collection.add(
-                documents=[chunk["text"]],
-                metadatas=[chunk.get("metadata", {})],
-                ids=[f"chunk_{i}"],
+        if not docs:
+            print("  ⚠️ 未找到文档，使用空索引")
+            self.chunks = [{"text": "暂无文档", "source": "N/A"}]
+            self.vectorizer = TfidfVectorizer(max_features=1000)
+            self.chunk_vectors = self.vectorizer.fit_transform(
+                [c["text"] for c in self.chunks]
             )
+            return
 
-        # 创建 LlamaIndex 索引
-        vector_store = ChromaVectorStore(chroma_collection=collection)
-        self.index = VectorStoreIndex.from_vector_store(
-            vector_store, embed_model=self.embed_model
+        # 分块
+        for doc in docs:
+            for chunk_text in self._split_text(doc["text"]):
+                self.chunks.append({
+                    "text": chunk_text,
+                    "source": doc["source"],
+                })
+        print(f"  分块: {len(self.chunks)} 个")
+
+        # TF-IDF 向量化
+        self.vectorizer = TfidfVectorizer(max_features=2000)
+        self.chunk_vectors = self.vectorizer.fit_transform(
+            [c["text"] for c in self.chunks]
         )
-
-        print(f"✅ 索引构建完成: {len(chunks)} 个块")
-        return len(chunks)
+        print(f"✅ 索引构建完成: {len(self.chunks)} 个块, {self.chunk_vectors.shape[1]} 维")
 
     def query(self, question: str, top_k: int | None = None) -> dict:
-        """检索并生成答案
+        """检索并返回最相关的文档块
 
         Returns:
             {
-                "answer": str,
-                "sources": [{"text": str, "score": float, "metadata": dict}],
+                "answer": str,         # 拼接的最相关块
+                "sources": [...],
                 "source_count": int,
             }
         """
         if top_k is None:
             top_k = self.top_k
 
-        query_engine = self.index.as_query_engine(
-            similarity_top_k=top_k,
-            response_mode="compact",
-        )
+        if self.chunk_vectors is None or self.chunk_vectors.shape[0] == 0:
+            return {
+                "answer": "知识库中暂无文档，请将 IT 运维文档放入 ./docs/ 目录。",
+                "sources": [],
+                "source_count": 0,
+            }
 
-        response = query_engine.query(question)
+        # 向量化查询
+        q_vec = self.vectorizer.transform([question])
 
+        # 余弦相似度
+        scores = cosine_similarity(q_vec, self.chunk_vectors)[0]
+
+        # Top-K
+        top_indices = np.argsort(scores)[::-1][:top_k]
+
+        # 组装结果
         sources = []
-        for node in response.source_nodes:
+        answer_parts = []
+        for idx in top_indices:
+            score = float(scores[idx])
+            if score < 0.01:
+                continue
+            chunk = self.chunks[idx]
             sources.append({
-                "text": node.node.text[:200],
-                "score": round(node.score or 0.0, 4),
-                "metadata": node.node.metadata,
+                "text": chunk["text"][:300],
+                "score": score,
+                "metadata": {"file_name": chunk["source"]},
             })
+            answer_parts.append(chunk["text"][:600])
+
+        if not answer_parts:
+            return {
+                "answer": "未找到与您问题相关的文档内容，请尝试更具体的关键词。",
+                "sources": [],
+                "source_count": 0,
+            }
 
         return {
-            "answer": str(response),
+            "answer": "\n\n---\n\n".join(answer_parts),
             "sources": sources,
             "source_count": len(sources),
         }

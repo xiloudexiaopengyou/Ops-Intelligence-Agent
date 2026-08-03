@@ -3,9 +3,9 @@ torch>=2.3.0
 transformers>=4.44.0
 accelerate>=0.30.0
 bitsandbytes>=0.43.0
+scipy>=1.10.0
 
-# 微调
-unsloth>=2024.7
+# 微调（QLoRA — 标准 HF 方案，不依赖 unsloth）
 peft>=0.11.0
 trl>=0.9.0
 datasets>=2.19.0
@@ -28,8 +28,7 @@ matplotlib>=3.8.0
 # 界面
 gradio>=4.20.0
 
-# 部署
-vllm>=0.5.0
+# 推理（单独安装：pip install vllm 或使用 Ollama）
 openai>=1.30.0
 
 # GPU 监控

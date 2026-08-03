@@ -30,3 +30,17 @@ Thumbs.db
 
 # 备份
 *_backup.*
+
+# AI 工具配置
+.claude/
+.superpowers/
+CLAUDE.md
+.claude.json
+
+# 开发计划文档（非用户文档）
+docs/superpowers/
+
+# 临时文件
+=0.25.0,
+/tmp/
+*.tmp

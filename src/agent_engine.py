@@ -58,21 +58,8 @@ class AgentEngine:
         self.tool_map = {t.name: t for t in self.tools}
 
     def _build_system_prompt(self) -> str:
-        tool_descriptions = "\n".join(
-            f"- {t.name}: {t.description}" for t in self.tools
-        )
-        return f"""你是一个智能 IT 运维助手，可以调用以下工具来完成任务：
-
-{tool_descriptions}
-
-工作流程：思考 → 调用工具 → 观察结果 → 继续思考或给出最终答案。
-
-规则：
-1. 先思考需要哪个工具和什么参数
-2. 以 JSON 格式调用工具：{{"tool": "工具名", "arguments": {{...}}}}
-3. 如果不需要工具，直接以纯文本回答
-4. 工具调用失败时尝试其他方式解决
-5. 给出最终答案时请总结所有步骤发现的问题和建议"""
+        tool_list = ", ".join(t.name for t in self.tools)
+        return f"""你是IT运维助手。工具: {tool_list}。需要工具时输出JSON: {{"tool":"名称","arguments":{{...}}}}。无需工具则直接回答。"""
 
     async def run(self, query: str) -> AgentResult:
         """执行 Agent 推理循环"""
@@ -176,7 +163,7 @@ class AgentEngine:
             model="itops",
             messages=messages,
             temperature=0.3,
-            max_tokens=1024,
+            max_tokens=256,
         )
         return response.choices[0].message.content
 
